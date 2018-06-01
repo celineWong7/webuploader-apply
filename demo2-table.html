@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>本地上传 by celine</title>
+	<meta charset="utf-8">
+	<script type="text/javascript" src="./jquery.js"></script>
+	<link rel="stylesheet" type="text/css" href="./webuploader/webuploader.css">
+	<script type="text/javascript" src="./webuploader/webuploader.html5only.min.js"></script>
+	<style type="text/css">
+		#uploader-demo {
+			width: 600px;
+		}
+		td a{
+			cursor: pointer;
+			color: #2a5f83;
+			
+		}
+		td a:hover {
+			text-decoration: underline;
+		}
+		/*进度条样式*/
+		progress {
+		    width: 200px;
+		    height: 10px;
+		    border: 1px solid #4aa7e7;  
+		    background-color: #f1f7fc;
+		    color: #4aa7e7; /*IE10*/
+
+		}
+		progress::-moz-progress-bar { background: #4aa7e7; }
+		progress::-webkit-progress-bar { background: #f1f7fc; }
+		progress::-webkit-progress-value  { background: #4aa7e7; }
+
+		/*表格样式*/
+		.uploader-list {
+			min-height: 100px;
+		}
+		.uploader-list table,th,td {
+			border: 1px solid #d8d8d8;
+		}
+		.uploader-list table {
+			border-collapse: collapse;
+			width: 100%;
+			text-align: center;
+		}
+		div.error { 
+			color: red;
+		}
+
+		/*上传按钮*/
+		.submit-box {
+			text-align: right;
+		}
+		.submit-box button {
+			color: #666;
+		    text-shadow: none ;
+		    background-color: #fff;
+		    border: 1px solid #d8d8d8;
+		    border-radius: 20px;
+		    padding: 10px 15px;
+		    margin: 0 5px;
+		    outline: none;
+		}
+		.submit-box button:hover,
+		.submit-box button:active {
+			border-color: #4aa7e7;
+			color: #4aa7e7;
+		}
+	</style>
+</head>
+<body>
+<!--上传图片 dom结构部分-->
+<div id="uploader-demo">
+	<!-- 点击按钮 -->
+    <div id="filePicker">选择图片</div>
+
+    <!--用来存放item-->
+    <div  class="uploader-list">
+    	<table>
+    		<thead>
+    			<th style="width:20%">图片</th>
+    			<th style="width:15%;">大小</th>
+    			<th style="width:50%;">状态</th>
+    			<th style="width:15%;">动作</th>
+    		</thead>
+    		<tbody id="fileList">
+    		</tbody>
+    	</table>
+    </div>
+    <div class="submit-box">
+    	<button id="uploadAll">上传全部</button>
+    </div>
+    
+
+</div>
+
+<script type="text/javascript">
+
+	var $list = $('#fileList'),
+        $btn = $('#filePicker'),
+        state = 'pending',
+        uploader;
+
+	var uploader = WebUploader.create({
+	    server: './upload.php',
+	    pick: '#filePicker',
+	    resize: false,// 不压缩image, 默认如果是jpeg，文件上传前会压缩一把再上传！
+
+	    // 只允许选择图片文件
+	    accept: {
+	    	title: 'Image',
+	    	extensions: 'gif,jpg,jpeg,bmp,png',
+	    	mimeTypes:'image/jpg,image/jpeg,image/png,img/bmp'
+	    }
+	});
+
+	// 当有文件被添加进队列的时候
+	uploader.on( 'fileQueued', function( file ) {
+		console.log('fileQueued' , file);
+		var size = (file.size/1024).toFixed(2) + 'KB';
+	    var	$li = $('<tr id="' + file.id + '" class="file-item thumbnail">' +
+	    				'<td><img src=""></td>' +
+	    				'<td>' + size + '</td>' +
+	    				'<td class="progress-td"><progress value="0" max="100">><span id="objprogress">85</span>%</progress><div class="error"></div></td>' +
+	    				'<td><a class="upload-this">上传</a> | <a class="remove-this">删除</a></td>' +
+	    			'</tr>'
+    			),
+	        $img = $li.find('img');
+	    $list.append( $li );
+
+	    // 创建缩略图
+	    // thumbnailWidth x thumbnailHeight 为 100 x 100
+	    uploader.makeThumb( file, function( error, src ) {
+	        if ( error ) {
+	            $img.replaceWith('<span>不能预览</span>');
+	            return;
+	        }
+
+	        $img.attr( 'src', src );
+	    }, 60, 60 );
+	});
+
+
+	// 文件上传过程中创建进度条实时显示。
+	uploader.on( 'uploadProgress', function( file, percentage ) {
+	    var $li = $( '#'+file.id ),
+	        $percent = $li.find('progress');
+
+	    // 避免重复创建
+	    if ( !$percent.length ) {
+	        $percent = $('<progress value="0" max="100">><span id="objprogress">0</span>%</progress>')
+	                .appendTo( $li )
+	                .find('td.progress');
+	    }
+	    $percent.val(percentage * 100);
+	});
+
+	// 文件上传成功，给item添加成功class, 用样式标记上传成功。
+	uploader.on( 'uploadSuccess', function( file ,response) {
+		// console.log("uploadSuccess",file,response);
+		// console.log(JSON.parse(response["_raw"]));
+	    $( '#'+file.id ).addClass('upload-state-done');
+    	// 上传成功
+    	$( '#'+file.id ).find("img").attr("tem-url",response["_raw"]);
+		uploadSuccessFun(file,"图片"+file.name+"上传成功！");
+
+
+	    
+	    
+	});
+
+	// 文件上传失败，显示上传出错。
+	uploader.on( 'uploadError', function( file ) {
+		// console.log("uploadError",file);
+		uploadErrorFun(file,"上传失败！QAQ");
+	});
+
+	// 完成上传完了，成功或者失败 - 可以统一设置一些样式，比如进度条消失。
+	uploader.on( 'uploadComplete', function( file ) {
+		// console.log('uploadComplete',file)
+	});
+
+
+	/** 动作 - 删除 */
+	$list.on('click', '.remove-this', function() {
+		var fileId = $(this).closest("tr").attr("id")
+    	uploader.removeFile( fileId );
+    	$(this).closest("tr").fadeOut();
+    	// console.log('文件状态',uploader.getFiles());
+	});
+
+	/** 动作 - 上传 */
+	$list.on('click', '.upload-this', function() {
+		var fileId = $(this).closest("tr").attr("id")
+    	uploader.upload( fileId );
+	});
+
+	/** 按钮 - 上传全部 */
+	$("#uploadAll").on('click', function(){
+		uploader.upload();
+	})
+
+	/**
+	 * 上传失败的提示处理
+	 * @param  {object} file 文件对象
+	 * @param  {string} msg  提示文字
+	 * @return
+	 */
+	function uploadErrorFun(file,msg){
+		$( '#'+file.id ).addClass('upload-state-undone');
+	    var $li = $( '#'+file.id ),
+	        $error = $li.find('div.error');
+
+	    // 避免重复创建
+	    if ( !$error.length ) {
+	        $error = $('<div class="error"></div>').appendTo( $li.find("td.progress") );
+	    }
+
+	    $error.text(msg);
+	}
+	/**
+	 * 上传成功的提示处理
+	 * @param  {object} file 文件对象
+	 * @param  {string} msg  提示文字
+	 * @return
+	 */
+	function uploadSuccessFun(file,msg){
+		$( '#'+file.id ).addClass('upload-state-done');
+	    var $li = $( '#'+file.id ),
+	        $success = $li.find('div.success');
+
+	    // 避免重复创建
+	    if ( !$success.length ) {
+	        $success = $('<div class="success"></div>').appendTo( $li.find("td.progress-td") );
+	    }
+	    $success.text(msg);
+	    $( '#'+file.id ).fadeOut(3000);
+	}
+
+</script>
+
+</body>
+</html>

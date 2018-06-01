@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>本地上传 by celine</title>
+	<meta charset="utf-8">
+	<script type="text/javascript" src="./jquery.js"></script>
+	<link rel="stylesheet" type="text/css" href="./webuploader/webuploader.css">
+	<script type="text/javascript" src="./webuploader/webuploader.html5only.min.js"></script>
+	<style type="text/css">
+		/*进度条样式*/
+		progress {
+		    width: 90%;
+		    height: 20px;
+		    /*border: 1px solid #4aa7e7;*/
+		    background-color: #f1f7fc;
+		    color: #4aa7e7; /*IE10*/
+
+		}
+		progress::-moz-progress-bar { background: #4aa7e7; }
+		progress::-webkit-progress-bar { background: #f1f7fc; }
+		progress::-webkit-progress-value  { background: #4aa7e7; }
+
+		/*图片样式*/
+		div.error { 
+			color: red;
+		}
+		.fileList {
+			position: relative;
+			width: 180px;
+		}
+		.fileList img{
+			width: 100%;
+		}
+		.img-mask {
+			opacity: 0.3;
+		}
+		.status-box {
+			position: absolute;
+			width: 100%;
+			text-align: center;
+			top: 50%;
+		}
+	</style>
+</head>
+<body>
+<!--上传图片 dom结构部分-->
+<div id="uploader-demo">
+	<!-- 点击按钮 -->
+    <div>
+	    <a id="filePicker2">替换图片1</a>
+	    <div id="fileList2" class="fileList" imageid="11">
+	    	<img id="img1" src=".\uploads\20180601\Desert.jpg">
+	    	<div class="status-box"></div>
+	    </div>
+    </div>
+
+    <!-- 点击按钮 -->
+    <div>
+	    <a id="filePicker1">替换图片2</a>
+	    <div id="fileList1" class="fileList" imageid="9">
+	    	<img id="img1" src="./uploads/ff.jpg">
+	    	<div class="status-box"></div>
+	    </div>
+    </div>
+</div>
+
+<script type="text/javascript">
+uploader("fileList1","filePicker1");
+uploader("fileList2","filePicker2");
+
+function uploader(itemId,pickId){
+
+	var $li = $('#'+itemId),
+        uploader;
+    var originSrc = $li.find("img").attr("src");
+
+	var uploader = WebUploader.create({
+		// 选完文件后，是否自动上传。
+    	auto: true,
+
+	    server: './upload.php',
+	    pick: {
+	    	id: '#'+pickId,
+	    	multiple: false // 只能选一个文件
+	    },
+
+	    resize: false,// 不压缩image, 默认如果是jpeg，文件上传前会压缩一把再上传！
+
+	    // 只允许选择图片文件
+	    accept: {
+	    	title: 'Image',
+	    	extensions: 'gif,jpg,jpeg,bmp,png',
+	    	mimeTypes:'image/jpg,image/jpeg,image/png,img/bmp'
+	    }
+	});
+
+	// 当有文件被添加进队列的时候
+	uploader.on( 'fileQueued', function( file ) {
+		console.log('fileQueued' , file);
+
+	    // 创建缩略图
+	    // thumbnailWidth x thumbnailHeight 为 100 x 100
+	    uploader.makeThumb( file, function( error, src ) {
+	        if ( error ) {
+	            $li.find("img").replaceWith('<span>不能预览</span>');
+	            return;
+	        }
+
+	        $li.find("img").attr( 'src', src ).addClass("img-mask");
+	    }, 180 );
+
+	    // 创建状态框（进度条&上传提示）
+	    var  $statusBox = $li.find('progress');
+
+	    // 避免重复创建
+	    if ( !$statusBox.length ) {
+	        $statusBox = $('<div class="status-box"></div>')
+	                .appendTo( $li );
+	    }
+	});
+
+
+	// 文件上传过程中创建进度条实时显示。
+	uploader.on( 'uploadProgress', function( file, percentage ) {
+	    // var $li = $( '#'+file.id );
+	      var  $percent = $li.find('progress');
+
+	    // 避免重复创建
+	    if ( !$percent.length ) {
+	        $percent = $('<progress value="0" max="100"><span id="objprogress">0</span>%</progress>')
+	                .appendTo( $li.find(".status-box") );
+	    }
+	    $percent.val(percentage * 90);
+	});
+
+	// 文件上传成功。
+	uploader.on( 'uploadSuccess', function( file ,response) {
+		// console.log("uploadSuccess",file,response);
+
+	    // 上传成功
+	    uploadSuccessFun(file,"上传成功！",response["_raw"]);  
+	    
+	});
+
+	// 文件上传失败，显示上传出错。
+	uploader.on( 'uploadError', function( file ) {
+		// console.log("uploadError",file);
+		uploadErrorFun(file,"上传失败！");
+	});
+
+	// 完成上传完了，成功或者失败，先删除进度条。
+	uploader.on( 'uploadComplete', function( file ) {
+		// console.log('uploadComplete',file)
+	    $li.find('progress').remove();
+	    uploader.reset();
+	});
+
+
+
+	/**
+	 * 上传成功的提示处理
+	 * @param  {object} file 文件对象
+	 * @param  {string} msg  提示文字
+	 * @param  {string}  src  返回的图片链接
+	 * @return
+	 */
+	function uploadSuccessFun(file,msg,src){
+	    var $success = $li.find('div.success');
+
+	    // 避免重复创建
+	    if ( !$success.length ) {
+	        $success = $('<div class="success"></div>').appendTo( $li.find(".status-box") );
+	    }
+	    $success.text(msg);
+
+    	setTimeout(function(){recoverImg(src)},2000);
+
+    	//替换剪贴板按钮的链接
+    	$li.closest(".img-div").find(".img-btns button").attr("data-clipboard-text",src);
+    	
+	}
+
+	/**
+	 * 上传失败的提示处理
+	 * @param  {object} file 文件对象
+	 * @param  {string} msg  提示文字
+	 * @return
+	 */
+	function uploadErrorFun(file,msg){
+	    var $error = $li.find('div.error');
+
+	    // 避免重复创建
+	    if ( !$error.length ) {
+	    	$li.find(".error").remove();
+	        $error = $('<div class="error"></div>').appendTo( $li.find(".status-box") );
+	    }
+
+	    $error.html(msg);
+	    setTimeout(function(){recoverImg(originSrc)},2000);
+	}
+
+	/**
+	 * 根据图片src替换图片src - 上传成功替换request的src，上传失败替换旧图片的src
+	 * @param  {string} src 
+	 * @return 
+	 */
+	function recoverImg(src){
+    	$li.find("img").attr("src",src).removeClass("img-mask");
+    	$li.find(".status-box").empty();
+	}
+
+}
+</script>
+
+</body>
+</html>
